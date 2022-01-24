@@ -1,0 +1,98 @@
+#$ -S /bin/bash
+#$ -j y
+#$ -cwd
+#$ -N run_jupyter
+#$ -l mem_requested=32G,tmp_requested=200G,tmpfree=200G
+#$ -V
+
+# SGE DEBUG METADATA
+cat /tmp/prolog_exec_"$JOB_ID"_"$SGE_TASK_ID".log
+
+echo "JOB: $JOB_ID TASK: $SGE_TASK_ID"
+echo "$HOSTNAME $tmp_requested $TMPDIR"
+
+#######################################
+# General user to customise
+#######################################
+# Downloading images take time - better to just pull to /directflow/ once.
+# IMAGE_URL="docker://prismaticbunny/jupyteronbrenner:latest"
+# IMAGE_TMP=$TMPDIR
+
+# Unprivileged user jovyan is setup in this container. Here is to specify which
+# local location is used to mount /home/jovyan inside the container for storing
+# notebooks. Each RUNNING jupyter SGE session should have its own dedicated dir.
+# Notebooks are saved on the local location and can be reused in the future session.
+
+JUPYTER_DIR="$HOME/jupyter_dir/$JOB_ID"
+mkdir -p $JUPYTER_DIR
+
+# Provide a local path of your data, this location will be mounted to /data
+# and expose your data inside the container.
+DATA_DIR="/directflow/SCCGGroupShare/projects"
+
+################################
+# DO NOT MODIFY (Adv User ONLY)
+################################
+
+# Get the hostname of the compute node on where jupyter is running
+# We'll set up an SSH tunnel to connect to the Juypter notebook server
+exec_host=$(hostname)
+ 
+# Set the port for the SSH tunnel
+# This part of the script uses a loop to search for available ports on the node;
+# this will allow multiple instances of GUI servers to be run from the same host node
+port="8888"
+pfound="0"
+while [ $port -lt 65535 ] ; do
+  check=$( netstat -tuna | awk '{print $4}' | grep ":$port *" )
+  if [ "$check" == "" ] ; then
+    pfound="1"
+    break
+  fi
+  : $((++port))
+done
+if [ $pfound -eq 0 ] ; then
+  echo "No available communication port found to establish the SSH tunnel."
+  echo "Try again later. Exiting."
+  exit
+fi
+ 
+## cd ${IMAGE_TMP}
+
+# Pull the image in a folder
+### POINT TO IMAGE HERE ###
+#imagename=${IMAGE_URL##*/}
+imagename=/directflow/SCCGGroupShare/projects/software/cellrank.sif
+#singularity pull $imagename $IMAGE_URL
+
+# To make things easier, I've set it to 8888. 
+
+echo "*****************************************************"
+echo "Setup SSH Tunnel - ON YOUR OWN COMPUTER macOS or Linux:"
+echo ""
+echo "ssh -N -f -L 8888:${exec_host}:${port} $USER@$SGE_O_HOST.garvan.unsw.edu.au"
+echo ""
+echo "*****************************************************"
+echo ""
+echo "*****************************************************"
+echo "Terminate SSH Tunnel - ON YOUR OWN COMPUTER do:"
+echo ""
+echo "kill \$( ps x | grep 'ssh.*-L 8888:${exec_host}:${port}' | awk '{print \$1}' )"
+echo ""
+echo "*****************************************************"
+echo ""
+
+# Conda environment within the container
+ENV_DIR=/opt/miniconda3/envs/cellrank
+
+# Launch our container
+# and mount our working directory to /home/jovyan in the container
+# and bind the run time directory to our home directory
+singularity exec -C \
+  -B ${JUPYTER_DIR}:$HOME \
+  -B ${DATA_DIR} \
+  ${imagename} \
+  ${ENV_DIR}/bin/jupyter notebook \
+  --no-browser \
+  --port=${port} --ip=0.0.0.0 \
+  --notebook-dir=${HOME}
