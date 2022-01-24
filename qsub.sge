@@ -14,15 +14,14 @@ echo "$HOSTNAME $tmp_requested $TMPDIR"
 #######################################
 # General user to customise
 #######################################
-# Downloading images take time - better to just pull to /directflow/ once.
-# IMAGE_URL="docker://prismaticbunny/jupyteronbrenner:latest"
-# IMAGE_TMP=$TMPDIR
+# Using my image for now... will update with required software
+IMAGE_URL="docker://prismaticbunny/cellrankjupyter:latest"
+IMAGE_TMP=$TMPDIR
 
 # Unprivileged user jovyan is setup in this container. Here is to specify which
 # local location is used to mount /home/jovyan inside the container for storing
 # notebooks. Each RUNNING jupyter SGE session should have its own dedicated dir.
 # Notebooks are saved on the local location and can be reused in the future session.
-
 JUPYTER_DIR="$HOME/jupyter_dir/$JOB_ID"
 mkdir -p $JUPYTER_DIR
 
@@ -60,12 +59,9 @@ fi
 ## cd ${IMAGE_TMP}
 
 # Pull the image in a folder
-### POINT TO IMAGE HERE ###
 #imagename=${IMAGE_URL##*/}
 imagename=/directflow/SCCGGroupShare/projects/software/cellrank.sif
 #singularity pull $imagename $IMAGE_URL
-
-# To make things easier, I've set it to 8888. 
 
 echo "*****************************************************"
 echo "Setup SSH Tunnel - ON YOUR OWN COMPUTER macOS or Linux:"
